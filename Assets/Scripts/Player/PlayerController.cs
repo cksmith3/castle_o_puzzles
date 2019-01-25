@@ -1078,8 +1078,10 @@ public class PlayerController : NetworkedBehaviour {
                 callback();
             }
         }
+        // think this is where I would added the force
         else if (isHanging) {
-            current_velocity.y = LedgeClimbBoost;
+            //current_velocity.y = LedgeClimbBoost;
+            current_velocity.y = 100;
             PreviousWallNormal = Vector3.zero;
             PreviousWallJumpNormal = Vector3.zero;
             PreviousWallJumpPos = Vector3.positiveInfinity;
@@ -1294,4 +1296,108 @@ public class PlayerController : NetworkedBehaviour {
         }
     }
     #endregion
+
+    #region to use the lad luncher
+    private void LUNCHER_INTERFACE() {
+        // Add additional gravity when going down (optional)
+        // OK added
+        if (current_velocity.y < 0) {
+            GravityMult += DownGravityAdd;
+        }
+
+        // Handle jumping and falling 
+        // added 
+        if (JumpBuffered()) {
+            if (OnGround() || CanWallJump() || IsWallRunning() || isHanging) {
+                DoJump();
+            }
+        }
+
+        // Set the player to a jumping state 
+        // Using this code becuase being tossed by a man cannon is a lot like jumping
+        private void DoJump() {
+            if (CanWallJump() || IsWallRunning())
+            {
+                PreviousWallJumpPos = transform.position;
+                PreviousWallJumpNormal = PreviousWallNormal;
+            }
+            if (!isHanging && utils.GetTimerTime(JUMP_METER) > JumpMeterThreshold)
+            {
+                if (!OnGround() && CanWallJump() && WallJumpReflect.magnitude > 0)
+                {
+                    //Debug.Log("Wall Jump");
+                    current_velocity += (WallJumpReflect - current_velocity) * WallJumpBoost * JumpMeterComputed;
+                    if (conserveUpwardMomentum)
+                    {
+                        current_velocity.y = Math.Max(current_velocity.y + WallJumpSpeed * JumpMeterComputed, WallJumpSpeed * JumpMeterComputed);
+                    }
+                    else
+                    {
+                        current_velocity.y = Math.Max(current_velocity.y, WallJumpSpeed * JumpMeterComputed);
+                    }
+                    utils.ResetTimer(JUMP_METER);
+                    utils.SetTimerFinished(WALL_HIT_TIMER);
+                }
+                else if (!OnGround() && IsWallRunning())
+                {
+                    //Debug.Log("Wall Run Jump");
+                    current_velocity += PreviousWallNormal * WallRunJumpSpeed * JumpMeterComputed;
+                    float pathvel = Vector3.Dot(current_velocity, transform.forward);
+                    float newspeed = Mathf.Clamp(pathvel + (WallRunJumpBoostAdd * JumpMeterComputed), 0f, WallRunJumpBoostSpeed);
+                    current_velocity += transform.forward * (newspeed - pathvel);
+                    current_velocity.y = Math.Max(current_velocity.y, WallRunJumpUpSpeed * JumpMeterComputed);
+                    utils.ResetTimer(JUMP_METER);
+                    utils.SetTimerFinished(WALL_HIT_TIMER);
+                }
+                else if (OnGround())
+                {
+                    //Debug.Log("Upward Jump");
+                    if (conserveUpwardMomentum)
+                    {
+                        current_velocity.y = Math.Max(current_velocity.y + JumpVelocity * JumpMeterComputed, JumpVelocity * JumpMeterComputed);
+                    }
+                    else
+                    {
+                        current_velocity.y = Math.Max(current_velocity.y, JumpVelocity * JumpMeterComputed);
+                    }
+                }
+                if (JumpBoostEnabled && CanJumpBoost())
+                {
+                    Vector3 movvec = GetMoveVector().normalized;
+                    float pathvel = Vector3.Dot(current_velocity, movvec);
+                    float newspeed = Mathf.Clamp(pathvel + JumpBoostAdd, 0f, JumpBoostSpeed);
+                    current_velocity += (Mathf.Max(newspeed, pathvel) - pathvel) * movvec;
+                }
+                foreach (Action callback in jump_callback_table)
+                {
+                    callback();
+                }
+            }
+            else if (isHanging)
+            {
+                current_velocity.y = LedgeClimbBoost;
+                PreviousWallNormal = Vector3.zero;
+                PreviousWallJumpNormal = Vector3.zero;
+                PreviousWallJumpPos = Vector3.positiveInfinity;
+            }
+            utils.ResetTimer(REGRAB_TIMER);
+            isJumping = true;
+            isFalling = false;
+            willJump = false;
+            isHanging = false;
+
+            // Intentionally set the timers over the limit
+            utils.SetTimerFinished(BUFFER_JUMP_TIMER);
+            utils.SetTimerFinished(LANDING_TIMER);
+            utils.SetTimerFinished(WALL_JUMP_TIMER);
+            utils.SetTimerFinished(WALL_RUN_TIMER);
+            utils.SetTimerFinished(WALL_CLIMB_TIMER);
+            utils.SetTimerFinished(MOVING_PLATFORM_TIMER);
+
+            WallJumpReflect = Vector3.zero;
+        }
+
+    }
+    #endregion
 }
+
